@@ -30,8 +30,9 @@ Version: $VERSION
 Section: utils
 Priority: optional
 Architecture: $ARCH
-Maintainer: Rouzbeh <rouzbeh@example.com>
-Depends: tailscale, xdg-utils, libdbus-1-3
+Maintainer: node0 <node0@coralnode.com>
+Depends: xdg-utils, libdbus-1-3
+Recommends: tailscale
 Description: Tray controller for Tailscale
  A Rust tray app for controlling Tailscale, exit nodes, and the local web interface.
 EOF

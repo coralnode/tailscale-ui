@@ -51,7 +51,7 @@ cargo install --path .
 
 ## Install from the GitHub release
 
-The release includes a Debian package. Install it directly with `apt`, which will resolve the package dependencies:
+The release includes a Debian package. Install it directly with `apt`:
 
 ```bash
 sudo apt install ./tailscale-ui_0.1.2_amd64.deb
@@ -76,9 +76,12 @@ The desktop entry is installed so the app appears in the desktop's application l
 
 The package depends on:
 
-- `tailscale`
 - `xdg-utils`
 - `libdbus-1-3`
+
+It recommends `tailscale`, which means the package can still be installed even if
+`tailscale` is not available from your configured APT sources. The app will exit
+at runtime if the `tailscale` command is missing from `PATH`.
 
 ## Building the Debian package
 
