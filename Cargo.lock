@@ -207,8 +207,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "tailscale-tray"
-version = "0.1.0"
+name = "tailscale-ui"
+version = "0.1.2"
 dependencies = [
  "ksni",
  "libc",

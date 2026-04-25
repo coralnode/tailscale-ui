@@ -1,6 +1,6 @@
-# tailscale_ui
+# tailscale-ui
 
-`tailscale_ui` is a Linux tray controller for Tailscale written in Rust.
+`tailscale-ui` is a Linux tray controller for Tailscale written in Rust.
 
 It wraps the `tailscale` CLI and gives you a tray menu for the common actions:
 
@@ -17,9 +17,9 @@ It wraps the `tailscale` CLI and gives you a tray menu for the common actions:
 
 ## Release model
 
-This repository is released by tag. The first release is `v0.1.0`.
+This repository is released by tag. The current release is `v0.1.2`.
 
-That means later code changes will not modify the `v0.1.0` release. If the code changes again, it will be released under a new tag and new release assets.
+That means later code changes will not modify the `v0.1.2` release. If the code changes again, it will be released under a new tag and new release assets.
 
 ## Requirements
 
@@ -40,7 +40,7 @@ If you want to build it yourself with Rust:
 ```bash
 sudo apt install cargo pkg-config libdbus-1-dev xdg-utils tailscale
 cargo build --release
-./target/release/tailscale-tray
+./target/release/tailscale-ui
 ```
 
 You can also install it into your Cargo bin directory:
@@ -54,22 +54,25 @@ cargo install --path .
 The release includes a Debian package. Install it directly with `apt`, which will resolve the package dependencies:
 
 ```bash
-sudo apt install ./tailscale-tray_0.1.0_amd64.deb
+sudo apt install ./tailscale-ui_0.1.2_amd64.deb
 ```
 
 If you downloaded the `.deb` somewhere else, point `apt` at that file instead:
 
 ```bash
-sudo apt install /path/to/tailscale-tray_0.1.0_amd64.deb
+sudo apt install /path/to/tailscale-ui_0.1.2_amd64.deb
 ```
 
 ## Debian package contents
 
 The package installs:
 
-- the tray binary in `/usr/bin/tailscale-tray`
-- a desktop entry in `/usr/share/applications/tailscale-tray.desktop`
-- documentation under `/usr/share/doc/tailscale-tray/`
+- the tray binary in `/usr/bin/tailscale-ui`
+- a desktop entry in `/usr/share/applications/tailscale-ui.desktop`
+- an application icon in `/usr/share/icons/hicolor/scalable/apps/tailscale-ui.svg`
+- documentation under `/usr/share/doc/tailscale-ui/`
+
+The desktop entry is installed so the app appears in the desktop's application launcher or "Show Apps" grid.
 
 The package depends on:
 

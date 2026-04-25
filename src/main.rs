@@ -10,9 +10,9 @@ use std::process::{Child, Command, Stdio};
 use std::thread;
 use std::time::Duration;
 
-const APP_NAME: &str = "tailscale-tray";
-const APP_TITLE: &str = "Tailscale Tray";
-const APP_VERSION: &str = "0.1.0";
+const APP_NAME: &str = "tailscale-ui";
+const APP_TITLE: &str = "Tailscale UI";
+const APP_VERSION: &str = "0.1.2";
 const REFRESH_INTERVAL_SECONDS: u64 = 15;
 const ADMIN_CONSOLE_URL: &str = "https://login.tailscale.com/admin";
 const LOCAL_WEB_URL: &str = "http://127.0.0.1:8088";

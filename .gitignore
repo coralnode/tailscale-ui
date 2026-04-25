@@ -3,3 +3,5 @@
 *.deb
 *.log
 .DS_Store
+/tailscale_tray.py
+/assets/tailscale_ui.svg
