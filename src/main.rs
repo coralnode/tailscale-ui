@@ -108,14 +108,8 @@ fn draw_rounded_rectangle(
 ) {
     for y in top..=bottom {
         for x in left..=right {
-            let inside_rect = x >= left + radius
-                && x <= right - radius
-                && y >= top
-                && y <= bottom
-                || y >= top + radius
-                    && y <= bottom - radius
-                    && x >= left
-                    && x <= right;
+            let inside_rect = x >= left + radius && x <= right - radius && y >= top && y <= bottom
+                || y >= top + radius && y <= bottom - radius && x >= left && x <= right;
             let in_corner = {
                 let cx = if x < left + radius {
                     left + radius
@@ -185,8 +179,7 @@ fn fill_polygon(pixels: &mut [u8], points: &[(i32, i32)], fill: [u8; 4]) {
             let (x1, y1) = points[i];
             let (x2, y2) = points[(i + 1) % points.len()];
             if (y1 <= y && y < y2) || (y2 <= y && y < y1) {
-                let x = x1 as f32
-                    + (y - y1) as f32 * (x2 - x1) as f32 / (y2 - y1) as f32;
+                let x = x1 as f32 + (y - y1) as f32 * (x2 - x1) as f32 / (y2 - y1) as f32;
                 intersections.push(x.round() as i32);
             }
         }
@@ -330,6 +323,7 @@ impl ExitNodeChoice {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 struct AppConfig {
     preferred_exit_node_id: String,
     preferred_exit_node_name: String,
@@ -337,7 +331,14 @@ struct AppConfig {
     preferred_exit_node_dns: String,
     use_exit_node: bool,
     exit_node_allow_lan_access: bool,
+    accept_routes_enabled: bool,
     autostart_enabled: bool,
+}
+
+#[derive(Debug, Clone, Default)]
+struct LivePrefs {
+    accept_routes: Option<bool>,
+    exit_node_allow_lan_access: Option<bool>,
 }
 
 impl Default for AppConfig {
@@ -349,6 +350,7 @@ impl Default for AppConfig {
             preferred_exit_node_dns: String::new(),
             use_exit_node: true,
             exit_node_allow_lan_access: false,
+            accept_routes_enabled: false,
             autostart_enabled: true,
         }
     }
@@ -637,6 +639,7 @@ impl TailscaleSnapshot {
 struct TailscaleTrayApp {
     config: AppConfig,
     snapshot: Option<TailscaleSnapshot>,
+    live_prefs: LivePrefs,
     last_message: String,
     error_message: Option<String>,
     current_exe: PathBuf,
@@ -656,6 +659,7 @@ impl TailscaleTrayApp {
         let mut app = Self {
             config: AppConfig::load(),
             snapshot: None,
+            live_prefs: LivePrefs::default(),
             last_message: String::new(),
             error_message: None,
             current_exe,
@@ -727,6 +731,18 @@ impl TailscaleTrayApp {
         }
     }
 
+    fn accept_routes_enabled(&self) -> bool {
+        self.live_prefs
+            .accept_routes
+            .unwrap_or(self.config.accept_routes_enabled)
+    }
+
+    fn exit_node_allow_lan_access_enabled(&self) -> bool {
+        self.live_prefs
+            .exit_node_allow_lan_access
+            .unwrap_or(self.config.exit_node_allow_lan_access)
+    }
+
     fn current_exit_node_label(&self, snapshot: &TailscaleSnapshot) -> String {
         let name = snapshot.current_exit_node_name.trim();
         let ip = snapshot.current_exit_node_ip.trim();
@@ -759,6 +775,26 @@ impl TailscaleTrayApp {
         TailscaleSnapshot::from_json(&value)
     }
 
+    fn read_live_prefs(&self) -> LivePrefs {
+        let output = Command::new("tailscale")
+            .args(["debug", "prefs", "--pretty=false"])
+            .output()
+            .ok();
+        let Some(output) = output else {
+            return LivePrefs::default();
+        };
+        if !output.status.success() {
+            return LivePrefs::default();
+        }
+        let value: Value = serde_json::from_slice(&output.stdout).unwrap_or(Value::Null);
+        LivePrefs {
+            accept_routes: value.get("RouteAll").and_then(Value::as_bool),
+            exit_node_allow_lan_access: value
+                .get("ExitNodeAllowLANAccess")
+                .and_then(Value::as_bool),
+        }
+    }
+
     fn preferred_exit_node_to_apply(&self, snapshot: &TailscaleSnapshot) -> Option<ExitNodeChoice> {
         if !snapshot.connected() || !self.config.use_exit_node {
             return None;
@@ -788,6 +824,21 @@ impl TailscaleTrayApp {
         }
     }
 
+    fn tailscale_set_args(
+        &self,
+        exit_node: Option<&ExitNodeChoice>,
+        accept_routes: bool,
+        lan_access: bool,
+    ) -> Vec<String> {
+        let mut args = vec!["set".to_string()];
+        if let Some(peer) = exit_node {
+            args.push(format!("--exit-node={}", peer.ip));
+            args.push(format!("--exit-node-allow-lan-access={lan_access}"));
+        }
+        args.push(format!("--accept-routes={accept_routes}"));
+        args
+    }
+
     fn refresh_status_sync(&mut self) {
         match self.refresh_status_inner() {
             Ok(()) => self.clear_error(),
@@ -797,17 +848,15 @@ impl TailscaleTrayApp {
 
     fn refresh_status_inner(&mut self) -> Result<(), String> {
         let snapshot = self.read_status()?;
+        self.live_prefs = self.read_live_prefs();
         self.last_message = self.status_line_for_snapshot(&snapshot);
         if let Some(peer) = self.preferred_exit_node_to_apply(&snapshot) {
             self.last_message = format!("Applying saved exit node: {}", peer.display_name());
-            let args = vec![
-                "set".to_string(),
-                format!("--exit-node={}", peer.ip),
-                format!(
-                    "--exit-node-allow-lan-access={}",
-                    self.config.exit_node_allow_lan_access
-                ),
-            ];
+            let args = self.tailscale_set_args(
+                Some(&peer),
+                self.accept_routes_enabled(),
+                self.exit_node_allow_lan_access_enabled(),
+            );
             self.run_tailscale_command(&args)?;
             let snapshot = self.read_status()?;
             self.snapshot = Some(snapshot);
@@ -977,14 +1026,11 @@ impl TailscaleTrayApp {
         self.config.use_exit_node = true;
         self.save_config();
 
-        let args = vec![
-            "set".to_string(),
-            format!("--exit-node={}", peer.ip),
-            format!(
-                "--exit-node-allow-lan-access={}",
-                self.config.exit_node_allow_lan_access
-            ),
-        ];
+        let args = self.tailscale_set_args(
+            Some(&peer),
+            self.accept_routes_enabled(),
+            self.exit_node_allow_lan_access_enabled(),
+        );
         self.last_message = format!("Using exit node: {}", peer.display_name());
         if let Err(err) = self.run_tailscale_command(&args) {
             self.report_error(err);
@@ -1009,6 +1055,47 @@ impl TailscaleTrayApp {
         self.last_message = "Clearing exit node".to_string();
         if let Err(err) = self.run_tailscale_command(&args) {
             self.report_error(err);
+        }
+        self.refresh_status_sync();
+    }
+
+    fn toggle_accept_routes(&mut self, enabled: bool) {
+        self.config.accept_routes_enabled = enabled;
+        self.save_config();
+
+        if !self
+            .snapshot
+            .as_ref()
+            .map(|s| s.connected())
+            .unwrap_or(false)
+        {
+            self.refresh_status_sync();
+            return;
+        }
+
+        let snapshot = self.snapshot.clone();
+        let peer = if self.config.use_exit_node {
+            snapshot
+                .as_ref()
+                .and_then(|snapshot| snapshot.find_preferred_peer(&self.config))
+                .filter(|peer| peer.online)
+        } else {
+            None
+        };
+
+        let args = self.tailscale_set_args(
+            peer.as_ref(),
+            enabled,
+            self.exit_node_allow_lan_access_enabled(),
+        );
+        self.last_message = format!(
+            "Setting subnet route acceptance: {}",
+            if enabled { "on" } else { "off" }
+        );
+        if let Err(err) = self.run_tailscale_command(&args) {
+            self.report_error(err);
+        } else {
+            self.live_prefs.accept_routes = Some(enabled);
         }
         self.refresh_status_sync();
     }
@@ -1039,6 +1126,7 @@ impl TailscaleTrayApp {
     fn toggle_lan_access(&mut self, enabled: bool) {
         self.config.exit_node_allow_lan_access = enabled;
         self.save_config();
+        self.live_prefs.exit_node_allow_lan_access = Some(enabled);
         let snapshot = self.snapshot.clone();
         if let Some(snapshot) = snapshot.as_ref() {
             if snapshot.connected() && self.config.use_exit_node {
@@ -1163,7 +1251,7 @@ impl TailscaleTrayApp {
         exit_node_items.push(exit_info.into());
 
         let mut use_exit_node = CheckmarkItem::default();
-        use_exit_node.label = "Use saved exit node".to_string();
+        use_exit_node.label = "Remember exit node".to_string();
         use_exit_node.checked = self.config.use_exit_node;
         use_exit_node.activate = Box::new(|this: &mut Self| {
             let new_value = !this.config.use_exit_node;
@@ -1173,17 +1261,31 @@ impl TailscaleTrayApp {
 
         let mut lan_access = CheckmarkItem::default();
         lan_access.label = "Allow LAN access via exit node".to_string();
-        lan_access.checked = self.config.exit_node_allow_lan_access;
+        lan_access.checked = self.exit_node_allow_lan_access_enabled();
         lan_access.enabled = self
             .snapshot
             .as_ref()
             .map(|s| s.connected())
             .unwrap_or(false);
         lan_access.activate = Box::new(|this: &mut Self| {
-            let new_value = !this.config.exit_node_allow_lan_access;
+            let new_value = !this.exit_node_allow_lan_access_enabled();
             this.toggle_lan_access(new_value);
         });
         exit_node_items.push(lan_access.into());
+
+        let mut accept_routes = CheckmarkItem::default();
+        accept_routes.label = "Accept subnet routes".to_string();
+        accept_routes.checked = self.accept_routes_enabled();
+        accept_routes.enabled = self
+            .snapshot
+            .as_ref()
+            .map(|s| s.connected())
+            .unwrap_or(false);
+        accept_routes.activate = Box::new(|this: &mut Self| {
+            let new_value = !this.accept_routes_enabled();
+            this.toggle_accept_routes(new_value);
+        });
+        exit_node_items.push(accept_routes.into());
 
         let mut choose_submenu_items = Vec::new();
         if let Some(snapshot) = &self.snapshot {

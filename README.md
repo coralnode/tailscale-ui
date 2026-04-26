@@ -7,8 +7,9 @@ It wraps the `tailscale` CLI and gives you a tray menu for the common actions:
 - show connection status
 - connect or disconnect Tailscale
 - choose and persist an exit node
-- reapply the saved exit node after reconnecting
+- remember the exit node and reapply it after reconnecting
 - toggle LAN access when using an exit node
+- toggle acceptance of subnet routes
 - start or stop the local Tailscale web interface
 - open the local web interface in a browser
 - open the Tailscale login page and admin console
@@ -17,9 +18,9 @@ It wraps the `tailscale` CLI and gives you a tray menu for the common actions:
 
 ## Release model
 
-This repository is released by tag. The current release is `v0.1.2`.
+This repository is released by tag. The current release is `v0.1.3`.
 
-That means later code changes will not modify the `v0.1.2` release. If the code changes again, it will be released under a new tag and new release assets.
+That means later code changes will not modify the `v0.1.3` release. If the code changes again, it will be released under a new tag and new release assets.
 
 ## Requirements
 
@@ -54,13 +55,13 @@ cargo install --path .
 The release includes a Debian package. Install it directly with `apt`:
 
 ```bash
-sudo apt install ./tailscale-ui_0.1.2_amd64.deb
+sudo apt install ./tailscale-ui_0.1.3_amd64.deb
 ```
 
 If you downloaded the `.deb` somewhere else, point `apt` at that file instead:
 
 ```bash
-sudo apt install /path/to/tailscale-ui_0.1.2_amd64.deb
+sudo apt install /path/to/tailscale-ui_0.1.3_amd64.deb
 ```
 
 ## Debian package contents
@@ -101,6 +102,7 @@ The tray app reads `tailscale status --json` on a timer and updates the indicato
 - `tailscale down`
 - `tailscale set --exit-node=...`
 - `tailscale set --exit-node-allow-lan-access=...`
+- `tailscale set --accept-routes=...`
 - `tailscale web --listen 127.0.0.1:8088`
 
 It stores its settings in the user config directory and remembers:
@@ -108,6 +110,7 @@ It stores its settings in the user config directory and remembers:
 - the chosen exit node
 - whether exit-node use is enabled
 - whether LAN access is allowed through the exit node
+- whether subnet routes are accepted
 - whether autostart is enabled
 
 ## Release notes
@@ -118,3 +121,13 @@ The tray icon uses status colors that are visible across tray themes:
 - yellow for login required
 - red for errors
 - gray for disconnected
+
+## v0.1.3
+
+This release adds exit-node controls that are easier to understand and keeps them in sync with live Tailscale state:
+
+- `Remember exit node` now makes it clear that the app re-applies the saved exit node after reconnecting
+- `Allow LAN access via exit node` stays separate from route acceptance
+- `Accept subnet routes` can be toggled from the tray menu
+- both `Allow LAN access` and `Accept subnet routes` reflect live Tailscale prefs when available
+- the Debian package includes the desktop launcher entry so the app appears in the application menu

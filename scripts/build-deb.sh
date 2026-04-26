@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="${VERSION:-0.1.2}"
+VERSION="${VERSION:-0.1.3}"
 ARCH="$(dpkg --print-architecture)"
 PACKAGE_NAME="tailscale-ui"
 STAGE_DIR="$ROOT_DIR/dist/${PACKAGE_NAME}_${VERSION}_${ARCH}"
